@@ -550,7 +550,10 @@ fn on_button_activate_update_states(
             MenuButtonAction::SettingsSound => {
                 menu_state.set(MenuState::SettingsSound);
             }
-            MenuButtonAction::BackToMainMenu => menu_state.set(MenuState::Main),
+            MenuButtonAction::BackToMainMenu => {
+                menu_state.set(MenuState::Main);
+                game_state.set(GameState::Menu)
+            }
             MenuButtonAction::BackToSettings => {
                 menu_state.set(MenuState::Settings);
             }

@@ -60,6 +60,7 @@ fn game_setup(
         },
         OnGameScreen,
         children![(
+            DespawnOnExit(GameState::Game),
             Button,
             ActivateOnPress,
             button_node.clone(),
@@ -83,11 +84,13 @@ fn game(time: Res<Time>, mut game_state: ResMut<NextState<GameState>>) {}
 fn scene() -> impl SceneList {
     bsn_list! {
         #CircularBase
+        DespawnOnExit::<GameState>(GameState::Game)
         Mesh3d(asset_value(Circle::new(4.0)))
         MeshMaterial3d::<StandardMaterial>(asset_value(Color::WHITE))
         Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2))
         --
         #Cube
+        DespawnOnExit::<GameState>(GameState::Game)
         Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
         MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
         Transform::from_xyz(0.0, 0.5, 0.0)
@@ -95,9 +98,11 @@ fn scene() -> impl SceneList {
         PointLight {
             shadow_maps_enabled: true,
         }
+        DespawnOnExit::<GameState>(GameState::Game)
         Transform::from_xyz(4.0, 8.0, 4.0)
         --
         Camera3d
+        DespawnOnExit::<GameState>(GameState::Game)
         Transform::from_xyz(-2.5, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y)
     }
 }
