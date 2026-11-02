@@ -1,7 +1,10 @@
 use bevy::{
     color::palettes::basic::{BLUE, LIME},
     prelude::*,
+    ui_widgets::{Activate, ActivateOnPress, Button, RadioButton, RadioGroup, ValueChange},
 };
+
+use crate::menu;
 
 use super::{DisplayQuality, GameState, TEXT_COLOR, Volume};
 
@@ -10,14 +13,40 @@ use super::{DisplayQuality, GameState, TEXT_COLOR, Volume};
 pub fn game_plugin(app: &mut App) {
     app.add_systems(OnEnter(GameState::Game), game_setup)
         .add_systems(Update, game.run_if(in_state(GameState::Game)));
-    }
+}
 
 // Tag component used to tag entities added on the game screen
 #[derive(Component)]
 struct OnGameScreen;
 
+fn game_setup(
+    mut commands: Commands,
+    display_quality: Res<DisplayQuality>,
+    volume: Res<Volume>,
+    asset_server: Res<AssetServer>,
+) {
+    let button_node = Node {
+        width: px(300),
+        height: px(65),
+        margin: UiRect::all(px(20)),
+        justify_content: JustifyContent::Center,
+        align_items: AlignItems::Center,
+        ..default()
+    };
+    let button_text_font = TextFont {
+        font_size: FontSize::Px(33.0),
+        ..default()
+    };
+    let button_icon_node = Node {
+        width: px(30),
+        // This takes the icons out of the flexbox flow, to be positioned exactly
+        position_type: PositionType::Absolute,
+        // The icon will be close to the left border of the button
+        left: px(10),
+        ..default()
+    };
+    let right_icon = asset_server.load("textures/Game Icons/fairy.png");
 
-fn game_setup(mut commands: Commands, display_quality: Res<DisplayQuality>, volume: Res<Volume>) {
     commands.spawn_scene_list(scene());
     commands.spawn((
         DespawnOnExit(GameState::Game),
@@ -25,23 +54,30 @@ fn game_setup(mut commands: Commands, display_quality: Res<DisplayQuality>, volu
             width: percent(100),
             height: percent(100),
             // center children
-            align_items: AlignItems::Center,
+            // align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
             ..default()
         },
         OnGameScreen,
-        
+        children![(
+            Button,
+            ActivateOnPress,
+            button_node.clone(),
+            menu::MenuButtonAction::BackToMainMenu,
+            children![
+                (ImageNode::new(right_icon), button_icon_node.clone()),
+                (
+                    Text::new("Return to Main Menu"),
+                    button_text_font.clone(),
+                    TextColor(TEXT_COLOR),
+                ),
+            ],
+        )],
     ));
-    // Spawn a 5 seconds timer to trigger going back to the menu
 }
 
 // Tick the timer, and change state when finished
-fn game(
-    time: Res<Time>,
-    mut game_state: ResMut<NextState<GameState>>,
-) {
-
-}
+fn game(time: Res<Time>, mut game_state: ResMut<NextState<GameState>>) {}
 
 /// set up a simple 3D scene
 fn scene() -> impl SceneList {

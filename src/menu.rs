@@ -83,7 +83,7 @@ const PRESSED_BUTTON: Color = Color::srgb(0.35, 0.75, 0.35);
 
 // All actions that can be triggered from a button click
 #[derive(Component)]
-enum MenuButtonAction {
+pub enum MenuButtonAction {
     Play,
     Settings,
     SettingsDisplay,
@@ -533,6 +533,7 @@ fn on_button_activate_update_states(
     mut menu_state: ResMut<NextState<MenuState>>,
     mut game_state: ResMut<NextState<GameState>>,
 ) {
+    bevy::log::info!("Inside the on button activate update status");
     if let Ok(menu_button_action) = action_q.get(event.entity) {
         match menu_button_action {
             MenuButtonAction::Quit => {
