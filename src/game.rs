@@ -14,7 +14,8 @@ pub fn game_plugin(app: &mut App) {
     app.add_systems(OnEnter(GameState::Game), game_setup)
         .add_systems(Update, move_box.run_if(in_state(GameState::Game)))
         .add_systems(Update, move_camera.run_if(in_state(GameState::Game)))
-        .add_systems(Update, keyboard_input.run_if(in_state(GameState::Game)));
+        .add_systems(Update, keyboard_input.run_if(in_state(GameState::Game)))
+        .insert_resource(Speed(5.0));
     }
 
 // Tag component used to tag entities added on the game screen
@@ -24,9 +25,13 @@ struct OnGameScreen;
 #[derive(Component, Clone, Default)]
 struct BoxMarker; 
 
-fn move_box( mut query: Query<&mut Transform, With<BoxMarker>>, time: Res<Time>){
+#[derive(Resource)]
+struct Speed(f32);
+
+
+fn move_box( mut query: Query<&mut Transform, With<BoxMarker>>, time: Res<Time>, speed: Res<Speed>){
     for mut transform in &mut query {
-        transform.translation.z -= 1.0 * time.delta_secs();
+        transform.translation.z -= speed.0 * time.delta_secs();
     }
 }
 
