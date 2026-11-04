@@ -16,63 +16,52 @@ pub fn game_plugin(app: &mut App) {
         .add_systems(Update, move_camera.run_if(in_state(GameState::Game)))
         .add_systems(Update, keyboard_input.run_if(in_state(GameState::Game)))
         .insert_resource(Speed(5.0));
-    }
+}
 
 // Tag component used to tag entities added on the game screen
 #[derive(Component)]
 struct OnGameScreen;
 
 #[derive(Component, Clone, Default)]
-struct BoxMarker; 
+struct BoxMarker;
 
 #[derive(Resource)]
 struct Speed(f32);
 
-
-fn move_box( mut query: Query<&mut Transform, With<BoxMarker>>, time: Res<Time>, speed: Res<Speed>){
+fn move_box(mut query: Query<&mut Transform, With<BoxMarker>>, time: Res<Time>, speed: Res<Speed>) {
     for mut transform in &mut query {
         transform.translation.z -= speed.0 * time.delta_secs();
     }
 }
 
-fn move_camera( mut camera_query: Query<&mut Transform, With<Camera3d>>, 
-    box_query: Query<&Transform, (With<BoxMarker>, Without<Camera3d>)>){
-    
-    let mut camera_transform = camera_query.single_mut().expect("There should only be 1 camera!!!!");
+fn move_camera(
+    mut camera_query: Query<&mut Transform, With<Camera3d>>,
+    box_query: Query<&Transform, (With<BoxMarker>, Without<Camera3d>)>,
+) {
+    let mut camera_transform = camera_query
+        .single_mut()
+        .expect("There should only be 1 camera!!!!");
     let box_transform = box_query.single().expect("There should only be 1 box!!!!");
 
-    let offset = box_transform.translation; 
+    let offset = box_transform.translation;
     camera_transform.translation = Vec3::new(0.0, 4.5, 9.0) + offset;
 }
 
 fn keyboard_input(
     keys: Res<ButtonInput<KeyCode>>,
-    mut query: Query<&mut Transform, With<BoxMarker>>, 
-    time: Res<Time>
+    mut query: Query<&mut Transform, With<BoxMarker>>,
+    time: Res<Time>,
+    speed: Res<Speed>,
 ) {
     let mut box_transform = query.single_mut().expect("There should only be 1 box!!!!");
 
-    // if keys.just_pressed(KeyCode::Space) {
-    //     // Space was pressed
-    // }
-    // if keys.just_released(KeyCode::ControlLeft) {
-    //     // Left Ctrl was released
-    // }
     if keys.pressed(KeyCode::KeyA) {
-        box_transform.translation.x -= 1.0 * time.delta_secs();
+        box_transform.translation.x -= speed.0 * time.delta_secs();
     }
     if keys.pressed(KeyCode::KeyD) {
-        box_transform.translation.x += 1.0 * time.delta_secs();
+        box_transform.translation.x += speed.0 * time.delta_secs();
     }
-    // // we can check multiple at once with `.any_*`
-    // if keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]) {
-    //     // Either the left or right shift are being held down
-    // }
-    // if keys.any_just_pressed([KeyCode::Delete, KeyCode::Backspace]) {
-    //     // Either delete or backspace was just pressed
-    // }
 }
-
 
 fn game_setup(
     mut commands: Commands,
