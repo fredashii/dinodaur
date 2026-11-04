@@ -124,9 +124,9 @@ fn game_setup(
 /// set up a simple 3D scene
 fn scene() -> impl SceneList {
     bsn_list! {
-        #CircularBase
+        #Track
         DespawnOnExit::<GameState>(GameState::Game)
-        Mesh3d(asset_value(Circle::new(4.0)))
+        Mesh3d(asset_value(Rectangle::from_corners(Vec2::new(-3.0, 1.0), Vec2::new(3.0, 10000.0))))
         MeshMaterial3d::<StandardMaterial>(asset_value(Color::WHITE))
         Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2))
         --
@@ -135,10 +135,11 @@ fn scene() -> impl SceneList {
         DespawnOnExit::<GameState>(GameState::Game)
         Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
         MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
-        Transform::from_xyz(0.0, 0.0, 0.0)
+        Transform::from_xyz(0.0, 0.5, 0.0)
         --
         PointLight {
             shadow_maps_enabled: true,
+            intensity: 1000000.0,
         }
         DespawnOnExit::<GameState>(GameState::Game)
         Transform::from_xyz(4.0, 8.0, 4.0)
