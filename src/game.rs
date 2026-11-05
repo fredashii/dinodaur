@@ -14,8 +14,7 @@ pub fn game_plugin(app: &mut App) {
     app.add_systems(OnEnter(GameState::Game), game_setup)
         .add_systems(Update, move_box.run_if(in_state(GameState::Game)))
         .add_systems(Update, move_camera.run_if(in_state(GameState::Game)))
-        .add_systems(Update, keyboard_input.run_if(in_state(GameState::Game)))
-        .insert_resource(Speed(5.0));
+        .add_systems(Update, keyboard_input.run_if(in_state(GameState::Game)));
 }
 
 // Tag component used to tag entities added on the game screen
@@ -25,11 +24,11 @@ struct OnGameScreen;
 #[derive(Component, Clone, Default)]
 struct BoxMarker;
 
-#[derive(Resource)]
+#[derive(Component, Clone, Default)]
 struct Speed(f32);
 
-fn move_box(mut query: Query<&mut Transform, With<BoxMarker>>, time: Res<Time>, speed: Res<Speed>) {
-    for mut transform in &mut query {
+fn move_box(mut query: Query<(&mut Transform, &Speed), With<BoxMarker>>, time: Res<Time>) {
+    for (mut transform, speed) in &mut query {
         transform.translation.z -= speed.0 * time.delta_secs();
     }
 }
@@ -49,11 +48,10 @@ fn move_camera(
 
 fn keyboard_input(
     keys: Res<ButtonInput<KeyCode>>,
-    mut query: Query<&mut Transform, With<BoxMarker>>,
+    mut query: Query<(&mut Transform, &Speed), With<BoxMarker>>,
     time: Res<Time>,
-    speed: Res<Speed>,
 ) {
-    let mut box_transform = query.single_mut().expect("There should only be 1 box!!!!");
+    let (mut box_transform, speed) = query.single_mut().expect("There should only be 1 box!!!!");
 
     if keys.pressed(KeyCode::KeyA) {
         box_transform.translation.x -= speed.0 * time.delta_secs();
@@ -136,6 +134,8 @@ fn scene() -> impl SceneList {
         Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
         MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
         Transform::from_xyz(0.0, 0.5, 0.0)
+        Speed(5.0)
+        
         --
         PointLight {
             shadow_maps_enabled: true,
