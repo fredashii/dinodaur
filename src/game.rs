@@ -1,7 +1,11 @@
 use bevy::{
     color::palettes::basic::{BLUE, LIME},
-    image::CompressedImageFormats,
+    image::{
+        CompressedImageFormats, ImageAddressMode, ImageLoaderSettings, ImageSampler,
+        ImageSamplerDescriptor,
+    },
     light::Skybox,
+    math::Affine2,
     prelude::*,
     render::render_resource::{TextureViewDescriptor, TextureViewDimension},
     ui_widgets::{Activate, ActivateOnPress, Button, RadioButton, RadioGroup, ValueChange},
@@ -33,6 +37,9 @@ struct Speed(f32);
 
 const CUBEMAPS: &[(&str, CompressedImageFormats)] =
     &[("textures/cubemap.png", CompressedImageFormats::NONE)];
+
+const ROAD_WIDTH: f32 = 6.0;
+const ROAD_LENGTH: f32 = 10000.0;
 
 fn move_box(mut query: Query<(&mut Transform, &Speed), With<BoxMarker>>, time: Res<Time>) {
     for (mut transform, speed) in &mut query {
@@ -73,7 +80,39 @@ fn game_setup(
     display_quality: Res<DisplayQuality>,
     volume: Res<Volume>,
     asset_server: Res<AssetServer>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
+    let texture_handle = asset_server
+    .load_builder()
+    .with_settings(|settings: &mut _| {
+            *settings = ImageLoaderSettings {
+                sampler: ImageSampler::Descriptor(ImageSamplerDescriptor {
+                    address_mode_u: ImageAddressMode::MirrorRepeat,
+                    address_mode_v: ImageAddressMode::MirrorRepeat,
+                    ..default()
+                }),
+                ..default()
+            };
+        })
+    .load("textures/road.png");
+
+    let material_handle = materials.add(StandardMaterial {
+        base_color_texture: Some(texture_handle),
+        // The texture is square, so one tile covers ROAD_WIDTH x ROAD_WIDTH world units.
+        uv_transform: Affine2::from_scale(Vec2::new(1.0, ROAD_LENGTH/ROAD_WIDTH)),
+        ..default()
+    });
+
+    let mesh_handle = meshes.add(Rectangle::new(ROAD_WIDTH, ROAD_LENGTH));
+
+    commands.spawn((
+        DespawnOnExit(GameState::Game),
+        Mesh3d(mesh_handle),
+        MeshMaterial3d(material_handle),
+        Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
+    ));
+
     let button_node = Node {
         width: px(300),
         height: px(65),
@@ -147,12 +186,12 @@ fn game_setup(
 /// set up a simple 3D scene
 fn scene(asset_server: Res<AssetServer>) -> impl SceneList {
     bsn_list! {
-            #Track
-            DespawnOnExit::<GameState>(GameState::Game)
-            Mesh3d(asset_value(Rectangle::from_corners(Vec2::new(-3.0, 1.0), Vec2::new(3.0, 10000.0))))
-            MeshMaterial3d::<StandardMaterial>(asset_value(Color::WHITE))
-            Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2))
-            --
+            // #Track
+            // DespawnOnExit::<GameState>(GameState::Game)
+            // Mesh3d(asset_value(Rectangle::from_corners(Vec2::new(-3.0, 1.0), Vec2::new(3.0, 10000.0))))
+            // MeshMaterial3d::<StandardMaterial>(asset_value(Color::WHITE))
+            // Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2))
+            // --
             #Cube
             BoxMarker
             DespawnOnExit::<GameState>(GameState::Game)
@@ -181,23 +220,26 @@ fn scene(asset_server: Res<AssetServer>) -> impl SceneList {
 }
 
 fn asset_loaded(
-    asset_server: Res<AssetServer>,
     mut images: ResMut<Assets<Image>>,
     skyboxes: Query<&mut Skybox>,
 ) {
     let skybox = skyboxes.single().expect("We should have a skybox");
     let handle = skybox.image.clone().unwrap();
-    if asset_server.load_state(&handle).is_loaded() {
+    // Only take a mutable borrow when there's work to do: `get_mut` marks the
+    // image as modified, which would re-upload it to the GPU every frame.
+    // `get` returns `None` until the image has loaded.
+    if images
+        .get(&handle)
+        .is_some_and(|image| image.texture_descriptor.array_layer_count() == 1)
+    {
         let mut image = images.get_mut(&handle).unwrap();
-        if image.texture_descriptor.array_layer_count() == 1 {
-            let layers = image.height() / image.width();
-            image
-                .reinterpret_stacked_2d_as_array(layers)
-                .expect("asset should be 2d texture and height will always be evenly divisible with the given layers");
-            image.texture_view_descriptor = Some(TextureViewDescriptor {
-                dimension: Some(TextureViewDimension::Cube),
-                ..default()
-            });
-        }
+        let layers = image.height() / image.width();
+        image
+            .reinterpret_stacked_2d_as_array(layers)
+            .expect("asset should be 2d texture and height will always be evenly divisible with the given layers");
+        image.texture_view_descriptor = Some(TextureViewDescriptor {
+            dimension: Some(TextureViewDimension::Cube),
+            ..default()
+        });
     }
 }
