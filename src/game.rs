@@ -2,15 +2,11 @@ use bevy::{
     image::{
         CompressedImageFormats, ImageAddressMode, ImageLoaderSettings, ImageSampler,
         ImageSamplerDescriptor,
-    },
-    light::Skybox,
-    math::Affine2,
-    prelude::*,
-    render::render_resource::{TextureViewDescriptor, TextureViewDimension},
-    ui_widgets::{ActivateOnPress, Button},
+    }, input::mouse::{AccumulatedMouseMotion, MouseMotion}, light::Skybox, math::Affine2, prelude::*, render::render_resource::{TextureViewDescriptor, TextureViewDimension}, ui_widgets::{ActivateOnPress, Button},
 };
 
 use crate::menu;
+use avian3d::prelude::*;
 
 use super::{GameState, TEXT_COLOR};
 
@@ -21,7 +17,8 @@ pub fn game_plugin(app: &mut App) {
         .add_systems(Update, move_box.run_if(in_state(GameState::Game)))
         .add_systems(Update, move_camera.run_if(in_state(GameState::Game)))
         .add_systems(Update, asset_loaded.run_if(in_state(GameState::Game)))
-        .add_systems(Update, keyboard_input.run_if(in_state(GameState::Game)));
+        // .add_systems(Update, keyboard_input.run_if(in_state(GameState::Game)));
+        .add_systems(Update, handle_mouse_motion.run_if(in_state(GameState::Game)));
 }
 
 // Tag component used to tag entities added on the game screen
@@ -40,9 +37,12 @@ const CUBEMAPS: &[(&str, CompressedImageFormats)] =
 const ROAD_WIDTH: f32 = 6.0;
 const ROAD_LENGTH: f32 = 10000.0;
 
-fn move_box(mut query: Query<(&mut Transform, &Speed), With<BoxMarker>>, time: Res<Time>) {
-    for (mut transform, speed) in &mut query {
-        transform.translation.z -= speed.0 * time.delta_secs();
+fn move_box(mut query: Query<(&mut LinearVelocity, &Speed), With<BoxMarker>>, time: Res<Time>) {
+    // for (mut transform, speed) in &mut query {
+    //     transform.translation.z -= speed.0 * time.delta_secs();
+    // }
+    for (mut velocity, speed) in &mut query{
+        velocity.z = -speed.0;
     }
 }
 
@@ -61,16 +61,40 @@ fn move_camera(
 
 fn keyboard_input(
     keys: Res<ButtonInput<KeyCode>>,
-    mut query: Query<(&mut Transform, &Speed), With<BoxMarker>>,
+    mut query: Query<(&mut LinearVelocity, &Speed), With<BoxMarker>>,
     time: Res<Time>,
 ) {
-    let (mut box_transform, speed) = query.single_mut().expect("There should only be 1 box!!!!");
+    let (mut velocity, speed) = query.single_mut().expect("There should only be 1 box!!!!");
 
     if keys.pressed(KeyCode::KeyA) {
-        box_transform.translation.x -= speed.0 * time.delta_secs();
+        velocity.x = -speed.0;
     }
-    if keys.pressed(KeyCode::KeyD) {
-        box_transform.translation.x += speed.0 * time.delta_secs();
+    else if keys.pressed(KeyCode::KeyD) {
+        velocity.x = speed.0;
+    } else{
+        velocity.x = 0.0;
+    }
+}
+
+fn handle_mouse_motion(accumulated_motion: Res<AccumulatedMouseMotion>, 
+    mut query: Query<(&mut LinearVelocity, &Speed), With<BoxMarker>>,
+    time: Res<Time>,
+) {
+    let (mut velocity, speed) = query.single_mut().expect("There should only be 1 box!!!!");
+
+
+    let delta = accumulated_motion.delta;
+    if delta != Vec2::ZERO {
+            velocity.x += delta.x * 0.05 ;
+            velocity.x = velocity.x.clamp(-10.0, 10.0)
+    } else{
+        if velocity.x.abs() > 0.0 {
+            let sign = velocity.x.signum();
+            velocity.x -= 10.0 * time.delta_secs() * sign;
+            if velocity.x.signum() != sign {
+                velocity.x = 0.0;
+            }
+        }
     }
 }
 
@@ -101,14 +125,21 @@ fn game_setup(
         ..default()
     });
 
-    let mesh_handle = meshes.add(Rectangle::new(ROAD_WIDTH, ROAD_LENGTH));
+    let mesh_handle: Handle<Mesh> = meshes.add(Rectangle::new(ROAD_WIDTH, ROAD_LENGTH));
 
     commands.spawn((
+        RigidBody::Static,
         DespawnOnExit(GameState::Game),
-        Mesh3d(mesh_handle),
-        MeshMaterial3d(material_handle),
-        Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
+        // Collider::Qua(ROAD_WIDTH, 0.1, ROAD_LENGTH),
+        Collider::cuboid(ROAD_WIDTH, 0.05, ROAD_LENGTH),
+        Transform::from_xyz(0.0, -0.05, 0.0),
+        children![(
+            Mesh3d(mesh_handle),
+            MeshMaterial3d(material_handle),
+            Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
+        )],
     ));
+    
 
     let button_node = Node {
         width: px(300),
@@ -190,12 +221,29 @@ fn scene() -> impl SceneList {
             // Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2))
             // --
             #Cube
+            RigidBody::Dynamic
+            Friction{static_coefficient: 0.0, dynamic_coefficient: 0.0, combine_rule: CoefficientCombine::Min}
             BoxMarker
             DespawnOnExit::<GameState>(GameState::Game)
             Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
             MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
             Transform::from_xyz(0.0, 0.5, 0.0)
-            Speed(5.0)
+            Collider::cuboid(1.0, 1.0, 1.0)
+            Speed(15.0)
+            LockedAxes::new().lock_rotation_x().lock_rotation_y().lock_rotation_z()
+            // --
+            // #Obstacle 
+            // DespawnOnExit::<GameState>(GameState::Game)
+            // Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
+            // MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
+            // Transform::from_xyz(0.0, 0.5, -10.0)
+            --
+            RigidBody::Static
+            AngularVelocity(Vec3::new(2.5, 3.5, 1.5))
+            Collider::cuboid(1.0, 1.0, 1.0)
+            Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
+            MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
+            Transform::from_xyz(0.0, 0.5, -10.0)
 
             --
             // PointLight {

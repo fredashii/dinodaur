@@ -1,3 +1,4 @@
+use avian3d::{PhysicsPlugins, debug_render::PhysicsDebugPlugin};
 use bevy::prelude::*;
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 
@@ -34,6 +35,7 @@ struct Volume(u32);
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
+        .add_plugins((PhysicsPlugins::default(), PhysicsDebugPlugin))
         .add_plugins(EguiPlugin::default())
         .add_plugins(WorldInspectorPlugin::new())
         // Insert as resource the initial value for the settings resources
