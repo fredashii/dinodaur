@@ -1,5 +1,4 @@
 use bevy::{
-    color::palettes::basic::{BLUE, LIME},
     image::{
         CompressedImageFormats, ImageAddressMode, ImageLoaderSettings, ImageSampler,
         ImageSamplerDescriptor,
@@ -8,12 +7,12 @@ use bevy::{
     math::Affine2,
     prelude::*,
     render::render_resource::{TextureViewDescriptor, TextureViewDimension},
-    ui_widgets::{Activate, ActivateOnPress, Button, RadioButton, RadioGroup, ValueChange},
+    ui_widgets::{ActivateOnPress, Button},
 };
 
 use crate::menu;
 
-use super::{DisplayQuality, GameState, TEXT_COLOR, Volume};
+use super::{GameState, TEXT_COLOR};
 
 // This plugin will contain the game. In this case, it's just be a screen that will
 // display the current settings for 5 seconds before returning to the menu
@@ -77,8 +76,6 @@ fn keyboard_input(
 
 fn game_setup(
     mut commands: Commands,
-    display_quality: Res<DisplayQuality>,
-    volume: Res<Volume>,
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -143,7 +140,7 @@ fn game_setup(
         rotation: Quat::IDENTITY,
     };
 
-    commands.spawn_scene_list(scene(asset_server));
+    commands.spawn_scene_list(scene());
     commands.spawn((
         Camera3d::default(),
         Projection::Perspective(PerspectiveProjection {
@@ -184,7 +181,7 @@ fn game_setup(
 }
 
 /// set up a simple 3D scene
-fn scene(asset_server: Res<AssetServer>) -> impl SceneList {
+fn scene() -> impl SceneList {
     bsn_list! {
             // #Track
             // DespawnOnExit::<GameState>(GameState::Game)
