@@ -2,7 +2,14 @@ use bevy::{
     image::{
         CompressedImageFormats, ImageAddressMode, ImageLoaderSettings, ImageSampler,
         ImageSamplerDescriptor,
-    }, input::mouse::{AccumulatedMouseMotion, MouseMotion}, light::Skybox, math::Affine2, prelude::*, render::render_resource::{TextureViewDescriptor, TextureViewDimension}, ui_widgets::{ActivateOnPress, Button},
+    },
+    input::mouse::{AccumulatedMouseMotion, MouseMotion},
+    light::Skybox,
+    math::Affine2,
+    prelude::*,
+    render::render_resource::{TextureViewDescriptor, TextureViewDimension},
+    ui_widgets::{ActivateOnPress, Button},
+    window::CursorOptions,
 };
 
 use crate::menu;
@@ -18,7 +25,10 @@ pub fn game_plugin(app: &mut App) {
         .add_systems(Update, move_camera.run_if(in_state(GameState::Game)))
         .add_systems(Update, asset_loaded.run_if(in_state(GameState::Game)))
         // .add_systems(Update, keyboard_input.run_if(in_state(GameState::Game)));
-        .add_systems(Update, handle_mouse_motion.run_if(in_state(GameState::Game)));
+        .add_systems(
+            Update,
+            handle_mouse_motion.run_if(in_state(GameState::Game)),
+        );
 }
 
 // Tag component used to tag entities added on the game screen
@@ -34,15 +44,16 @@ struct Speed(f32);
 const CUBEMAPS: &[(&str, CompressedImageFormats)] =
     &[("textures/cubemap.png", CompressedImageFormats::NONE)];
 
-const ROAD_WIDTH: f32 = 6.0;
+const ROAD_WIDTH: f32 = 10.0;
 const ROAD_LENGTH: f32 = 10000.0;
 
+const acceleration: f32 = 5.0;
+
 fn move_box(mut query: Query<(&mut LinearVelocity, &Speed), With<BoxMarker>>, time: Res<Time>) {
-    // for (mut transform, speed) in &mut query {
-    //     transform.translation.z -= speed.0 * time.delta_secs();
-    // }
-    for (mut velocity, speed) in &mut query{
-        velocity.z = -speed.0;
+    for (mut velocity, speed) in &mut query {
+        // velocity.z = -speed.0;
+        velocity.z -= acceleration * time.delta_secs();
+        velocity.z = velocity.z.clamp(-100.0, 0.0);
     }
 }
 
@@ -68,29 +79,28 @@ fn keyboard_input(
 
     if keys.pressed(KeyCode::KeyA) {
         velocity.x = -speed.0;
-    }
-    else if keys.pressed(KeyCode::KeyD) {
+    } else if keys.pressed(KeyCode::KeyD) {
         velocity.x = speed.0;
-    } else{
+    } else {
         velocity.x = 0.0;
     }
 }
 
-fn handle_mouse_motion(accumulated_motion: Res<AccumulatedMouseMotion>, 
+fn handle_mouse_motion(
+    accumulated_motion: Res<AccumulatedMouseMotion>,
     mut query: Query<(&mut LinearVelocity, &Speed), With<BoxMarker>>,
     time: Res<Time>,
 ) {
     let (mut velocity, speed) = query.single_mut().expect("There should only be 1 box!!!!");
 
-
     let delta = accumulated_motion.delta;
     if delta != Vec2::ZERO {
-            velocity.x += delta.x * 0.05 ;
-            velocity.x = velocity.x.clamp(-10.0, 10.0)
-    } else{
+        velocity.x += delta.x * 0.05;
+        velocity.x = velocity.x.clamp(-10.0, 10.0)
+    } else {
         if velocity.x.abs() > 0.0 {
             let sign = velocity.x.signum();
-            velocity.x -= 10.0 * time.delta_secs() * sign;
+            velocity.x -= 30.0 * time.delta_secs() * sign;
             if velocity.x.signum() != sign {
                 velocity.x = 0.0;
             }
@@ -103,10 +113,14 @@ fn game_setup(
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut cursor_options: Single<&mut CursorOptions>,
 ) {
+    cursor_options.visible = false;
+    cursor_options.grab_mode = bevy::window::CursorGrabMode::Locked;
+
     let texture_handle = asset_server
-    .load_builder()
-    .with_settings(|settings: &mut _| {
+        .load_builder()
+        .with_settings(|settings: &mut _| {
             *settings = ImageLoaderSettings {
                 sampler: ImageSampler::Descriptor(ImageSamplerDescriptor {
                     address_mode_u: ImageAddressMode::MirrorRepeat,
@@ -116,12 +130,12 @@ fn game_setup(
                 ..default()
             };
         })
-    .load("textures/road.png");
+        .load("textures/road.png");
 
     let material_handle = materials.add(StandardMaterial {
         base_color_texture: Some(texture_handle),
         // The texture is square, so one tile covers ROAD_WIDTH x ROAD_WIDTH world units.
-        uv_transform: Affine2::from_scale(Vec2::new(1.0, ROAD_LENGTH/ROAD_WIDTH)),
+        uv_transform: Affine2::from_scale(Vec2::new(1.0, ROAD_LENGTH / ROAD_WIDTH)),
         ..default()
     });
 
@@ -139,7 +153,6 @@ fn game_setup(
             Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
         )],
     ));
-    
 
     let button_node = Node {
         width: px(300),
@@ -231,8 +244,9 @@ fn scene() -> impl SceneList {
             Collider::cuboid(1.0, 1.0, 1.0)
             Speed(15.0)
             LockedAxes::new().lock_rotation_x().lock_rotation_y().lock_rotation_z()
+            LinearVelocity(Vec3::new(0.0, 0.0, -15.0))
             // --
-            // #Obstacle 
+            // #Obstacle
             // DespawnOnExit::<GameState>(GameState::Game)
             // Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
             // MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
@@ -264,10 +278,7 @@ fn scene() -> impl SceneList {
         }
 }
 
-fn asset_loaded(
-    mut images: ResMut<Assets<Image>>,
-    skyboxes: Query<&mut Skybox>,
-) {
+fn asset_loaded(mut images: ResMut<Assets<Image>>, skyboxes: Query<&mut Skybox>) {
     let skybox = skyboxes.single().expect("We should have a skybox");
     let handle = skybox.image.clone().unwrap();
     // Only take a mutable borrow when there's work to do: `get_mut` marks the
