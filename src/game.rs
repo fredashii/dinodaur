@@ -3,7 +3,7 @@ use bevy::{
         CompressedImageFormats, ImageAddressMode, ImageLoaderSettings, ImageSampler,
         ImageSamplerDescriptor,
     },
-    input::mouse::{AccumulatedMouseMotion, MouseMotion},
+    input::mouse::AccumulatedMouseMotion,
     light::Skybox,
     math::Affine2,
     prelude::*,
@@ -24,6 +24,7 @@ pub fn game_plugin(app: &mut App) {
         .add_systems(Update, move_box.run_if(in_state(GameState::Game)))
         .add_systems(Update, move_camera.run_if(in_state(GameState::Game)))
         .add_systems(Update, asset_loaded.run_if(in_state(GameState::Game)))
+        .add_systems(Update, get_collisions.run_if(in_state(GameState::Game)))
         // .add_systems(Update, keyboard_input.run_if(in_state(GameState::Game)));
         .add_systems(
             Update,
@@ -36,10 +37,12 @@ pub fn game_plugin(app: &mut App) {
 struct OnGameScreen;
 
 #[derive(Component, Clone, Default)]
-struct BoxMarker;
+struct Player {
+    time: f32,
+}
 
 #[derive(Component, Clone, Default)]
-struct Speed(f32);
+struct RampMarker;
 
 const CUBEMAPS: &[(&str, CompressedImageFormats)] =
     &[("textures/cubemap.png", CompressedImageFormats::NONE)];
@@ -47,19 +50,46 @@ const CUBEMAPS: &[(&str, CompressedImageFormats)] =
 const ROAD_WIDTH: f32 = 10.0;
 const ROAD_LENGTH: f32 = 10000.0;
 
-const acceleration: f32 = 5.0;
+const ACCELERATION: f32 = 5.0;
+const DEACCELERATION: f32 = 1000.0;
 
-fn move_box(mut query: Query<(&mut LinearVelocity, &Speed), With<BoxMarker>>, time: Res<Time>) {
-    for (mut velocity, speed) in &mut query {
-        // velocity.z = -speed.0;
-        velocity.z -= acceleration * time.delta_secs();
-        velocity.z = velocity.z.clamp(-100.0, 0.0);
+
+fn get_collisions(mut query: Query<(&CollidingEntities, &mut Player), With<Player>>, ramps: Query<Entity, With<RampMarker>>) {
+    for (colliding_entities, mut player) in &mut query {
+        for entity in colliding_entities.iter() {
+            if ramps.get(*entity).is_ok() {
+                player.time = 5.0;
+            }
+        }
+    }
+}
+
+fn move_box(mut query: Query<(&mut LinearVelocity, &mut Player), With<Player>>, time: Res<Time>) {
+    for (mut velocity, mut player) in &mut query {
+        if player.time == 0.0{
+            if  velocity.z >= -20.0{
+                velocity.z -= ACCELERATION * time.delta_secs();
+                if velocity.z < -20.0 {
+                    velocity.z = -20.0
+                }
+            } else {
+                velocity.z += DEACCELERATION * time.delta_secs();
+                if velocity.z > -20.0 {
+                    velocity.z = -20.0
+                }
+            }
+        } else if player.time > 0.0{
+            velocity.z -= 200.0 * time.delta_secs();
+            player.time -= 1.0 * time.delta_secs();
+        } else if player.time < 0.0{
+            player.time = 0.0;
+        }
     }
 }
 
 fn move_camera(
     mut camera_query: Query<&mut Transform, With<Camera3d>>,
-    box_query: Query<&Transform, (With<BoxMarker>, Without<Camera3d>)>,
+    box_query: Query<&Transform, (With<Player>, Without<Camera3d>)>,
 ) {
     let mut camera_transform = camera_query
         .single_mut()
@@ -68,34 +98,24 @@ fn move_camera(
 
     let offset = box_transform.translation;
     camera_transform.translation = Vec3::new(0.0, 4.5, 9.0) + offset;
-}
 
-fn keyboard_input(
-    keys: Res<ButtonInput<KeyCode>>,
-    mut query: Query<(&mut LinearVelocity, &Speed), With<BoxMarker>>,
-    time: Res<Time>,
-) {
-    let (mut velocity, speed) = query.single_mut().expect("There should only be 1 box!!!!");
+    let (yaw, pitch, _) = camera_transform.rotation.to_euler(EulerRot::YXZ);
 
-    if keys.pressed(KeyCode::KeyA) {
-        velocity.x = -speed.0;
-    } else if keys.pressed(KeyCode::KeyD) {
-        velocity.x = speed.0;
-    } else {
-        velocity.x = 0.0;
-    }
+    let roll = box_transform.translation.x * -0.05;
+
+    camera_transform.rotation = Quat::from_euler(EulerRot::YXZ, yaw, pitch, roll);
 }
 
 fn handle_mouse_motion(
     accumulated_motion: Res<AccumulatedMouseMotion>,
-    mut query: Query<(&mut LinearVelocity, &Speed), With<BoxMarker>>,
+    mut query: Query<&mut LinearVelocity, With<Player>>,
     time: Res<Time>,
 ) {
-    let (mut velocity, speed) = query.single_mut().expect("There should only be 1 box!!!!");
+    let mut velocity = query.single_mut().expect("There should only be 1 box!!!!");
 
     let delta = accumulated_motion.delta;
     if delta != Vec2::ZERO {
-        velocity.x += delta.x * 0.05;
+        velocity.x += delta.x * 0.3;
         velocity.x = velocity.x.clamp(-10.0, 10.0)
     } else {
         if velocity.x.abs() > 0.0 {
@@ -152,6 +172,26 @@ fn game_setup(
             MeshMaterial3d(material_handle),
             Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
         )],
+    ));
+
+    commands.spawn((
+        RigidBody::Static,
+        DespawnOnExit(GameState::Game),
+        Transform::from_xyz(0.0, 0.0, -20.0)
+            .with_rotation(Quat::from_rotation_y(std::f32::consts::FRAC_PI_2)),
+        
+        Mesh3d(meshes.add(Extrusion::new(
+            Triangle2d::new(
+                Vec2::new(0.0, 0.0),
+                Vec2::new(6.0, 0.0),
+                Vec2::new(6.0, 2.0),
+            ),
+            10.0,
+        ))),
+        MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
+        ColliderConstructor::ConvexHullFromMesh,
+        CollidingEntities::default(),
+        RampMarker,
     ));
 
     let button_node = Node {
@@ -227,55 +267,35 @@ fn game_setup(
 /// set up a simple 3D scene
 fn scene() -> impl SceneList {
     bsn_list! {
-            // #Track
-            // DespawnOnExit::<GameState>(GameState::Game)
-            // Mesh3d(asset_value(Rectangle::from_corners(Vec2::new(-3.0, 1.0), Vec2::new(3.0, 10000.0))))
-            // MeshMaterial3d::<StandardMaterial>(asset_value(Color::WHITE))
-            // Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2))
-            // --
-            #Cube
-            RigidBody::Dynamic
-            Friction{static_coefficient: 0.0, dynamic_coefficient: 0.0, combine_rule: CoefficientCombine::Min}
-            BoxMarker
-            DespawnOnExit::<GameState>(GameState::Game)
-            Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
-            MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
-            Transform::from_xyz(0.0, 0.5, 0.0)
-            Collider::cuboid(1.0, 1.0, 1.0)
-            Speed(15.0)
-            LockedAxes::new().lock_rotation_x().lock_rotation_y().lock_rotation_z()
-            LinearVelocity(Vec3::new(0.0, 0.0, -15.0))
-            // --
-            // #Obstacle
-            // DespawnOnExit::<GameState>(GameState::Game)
-            // Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
-            // MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
-            // Transform::from_xyz(0.0, 0.5, -10.0)
-            --
-            RigidBody::Static
-            AngularVelocity(Vec3::new(2.5, 3.5, 1.5))
-            Collider::cuboid(1.0, 1.0, 1.0)
-            Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
-            MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
-            Transform::from_xyz(0.0, 0.5, -10.0)
-
-            --
-            // PointLight {
-            //     shadow_maps_enabled: true,
-            //     intensity: 1000000.0,
-            // }
-            // DespawnOnExit::<GameState>(GameState::Game)
-            // Transform::from_xyz(4.0, 8.0, 4.0)
-    // directional 'sun' light
-
-            DirectionalLight {
-                illuminance: light_consts::lux::OVERCAST_DAY,
-                shadow_maps_enabled: true,
-
-            }
-            Transform::from_xyz(2.0, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y)
-            --
+        #Cube
+        RigidBody::Dynamic
+        Friction{static_coefficient: 0.0, dynamic_coefficient: 0.0, combine_rule: CoefficientCombine::Min}
+        Player{
+            time: 0.0
         }
+        DespawnOnExit::<GameState>(GameState::Game)
+        Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
+        MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
+        Transform::from_xyz(0.0, 0.5, 0.0)
+        Collider::sphere(0.5)
+        LockedAxes::new().lock_rotation_x().lock_rotation_y().lock_rotation_z()
+        LinearVelocity(Vec3::new(0.0, 0.0, -15.0))
+        CollidingEntities::default()
+        --
+        RigidBody::Static
+        AngularVelocity(Vec3::new(2.5, 3.5, 1.5))
+        Collider::cuboid(1.0, 1.0, 1.0)
+        Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
+        MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
+        Transform::from_xyz(0.0, 0.5, -10.0)
+        --
+        DirectionalLight {
+            illuminance: light_consts::lux::OVERCAST_DAY,
+            shadow_maps_enabled: true,
+        }
+        Transform::from_xyz(2.0, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y)
+        --
+    }
 }
 
 fn asset_loaded(mut images: ResMut<Assets<Image>>, skyboxes: Query<&mut Skybox>) {
