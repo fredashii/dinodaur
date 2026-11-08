@@ -1,3 +1,5 @@
+use std::f32::consts::PI;
+
 use bevy::{
     image::{
         CompressedImageFormats, ImageAddressMode, ImageLoaderSettings, ImageSampler,
@@ -53,8 +55,10 @@ const ROAD_LENGTH: f32 = 10000.0;
 const ACCELERATION: f32 = 5.0;
 const DEACCELERATION: f32 = 1000.0;
 
-
-fn get_collisions(mut query: Query<(&CollidingEntities, &mut Player), With<Player>>, ramps: Query<Entity, With<RampMarker>>) {
+fn get_collisions(
+    mut query: Query<(&CollidingEntities, &mut Player), With<Player>>,
+    ramps: Query<Entity, With<RampMarker>>,
+) {
     for (colliding_entities, mut player) in &mut query {
         for entity in colliding_entities.iter() {
             if ramps.get(*entity).is_ok() {
@@ -66,8 +70,11 @@ fn get_collisions(mut query: Query<(&CollidingEntities, &mut Player), With<Playe
 
 fn move_box(mut query: Query<(&mut LinearVelocity, &mut Player), With<Player>>, time: Res<Time>) {
     for (mut velocity, mut player) in &mut query {
-        if player.time == 0.0{
-            if  velocity.z >= -20.0{
+        if velocity.y < -5.0 {
+            velocity.y = -5.0;
+        }
+        if player.time == 0.0 {
+            if velocity.z >= -20.0 {
                 velocity.z -= ACCELERATION * time.delta_secs();
                 if velocity.z < -20.0 {
                     velocity.z = -20.0
@@ -78,10 +85,10 @@ fn move_box(mut query: Query<(&mut LinearVelocity, &mut Player), With<Player>>, 
                     velocity.z = -20.0
                 }
             }
-        } else if player.time > 0.0{
+        } else if player.time > 0.0 {
             velocity.z -= 200.0 * time.delta_secs();
             player.time -= 1.0 * time.delta_secs();
-        } else if player.time < 0.0{
+        } else if player.time < 0.0 {
             player.time = 0.0;
         }
     }
@@ -138,6 +145,16 @@ fn game_setup(
     cursor_options.visible = false;
     cursor_options.grab_mode = bevy::window::CursorGrabMode::Locked;
 
+    // commands.spawn((
+    //     // This is equivalent to "models/FlightHelmet/FlightHelmet.gltf#Scene0"
+    //     // The `#Scene0` label here is very important because it tells bevy to load the first scene in the glTF file.
+    //     // If this isn't specified bevy doesn't know which part of th/Users/fredashi/Downloads/freddy_fazbear_... (1)/texturese glTF file to load.
+    //     WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/freddie.glb"))),
+    //     // You can use the transform to give it a position
+    //     Transform::from_xyz(2.0, 0.0, -60.0),
+    //     DespawnOnExit(GameState::Game),
+    // ));
+
     let texture_handle = asset_server
         .load_builder()
         .with_settings(|settings: &mut _| {
@@ -179,14 +196,13 @@ fn game_setup(
         DespawnOnExit(GameState::Game),
         Transform::from_xyz(0.0, 0.0, -20.0)
             .with_rotation(Quat::from_rotation_y(std::f32::consts::FRAC_PI_2)),
-        
         Mesh3d(meshes.add(Extrusion::new(
             Triangle2d::new(
                 Vec2::new(0.0, 0.0),
                 Vec2::new(6.0, 0.0),
-                Vec2::new(6.0, 2.0),
+                Vec2::new(3.0, 2.0),
             ),
-            10.0,
+            2.0,
         ))),
         MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
         ColliderConstructor::ConvexHullFromMesh,
@@ -267,35 +283,41 @@ fn game_setup(
 /// set up a simple 3D scene
 fn scene() -> impl SceneList {
     bsn_list! {
-        #Cube
-        RigidBody::Dynamic
-        Friction{static_coefficient: 0.0, dynamic_coefficient: 0.0, combine_rule: CoefficientCombine::Min}
-        Player{
-            time: 0.0
+            #Cube
+            RigidBody::Dynamic
+            Friction{static_coefficient: 0.0, dynamic_coefficient: 0.0, combine_rule: CoefficientCombine::Min}
+            Player{
+                time: 0.0
+            }
+            DespawnOnExit::<GameState>(GameState::Game)
+            // Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
+            // MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
+            Children [
+                WorldAssetRoot("models/dinosaur.glb#Scene0")
+                Transform::from_xyz(0.0, -0.5, 0.0)
+                .with_scale(Vec3::splat(1.0))
+                .with_rotation(Quat::from_rotation_y(std::f32::consts::PI) * Quat::from_rotation_x(std::f32::consts::PI/-6.0))
+            ]
+            Transform::from_xyz(0.0, 0.5, 0.0)
+            Collider::sphere(0.5)
+            LockedAxes::new().lock_rotation_x().lock_rotation_y().lock_rotation_z()
+            LinearVelocity(Vec3::new(0.0, 0.0, -15.0))
+            CollidingEntities::default()
+            --
+            RigidBody::Static
+            AngularVelocity(Vec3::new(2.5, 3.5, 1.5))
+            Collider::cuboid(1.0, 1.0, 1.0)
+            Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
+            MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
+            Transform::from_xyz(0.0, 0.5, -10.0)
+            --
+            DirectionalLight {
+                illuminance: light_consts::lux::OVERCAST_DAY,
+                shadow_maps_enabled: true,
+            }
+            Transform::from_xyz(2.0, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y)
+            --
         }
-        DespawnOnExit::<GameState>(GameState::Game)
-        Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
-        MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
-        Transform::from_xyz(0.0, 0.5, 0.0)
-        Collider::sphere(0.5)
-        LockedAxes::new().lock_rotation_x().lock_rotation_y().lock_rotation_z()
-        LinearVelocity(Vec3::new(0.0, 0.0, -15.0))
-        CollidingEntities::default()
-        --
-        RigidBody::Static
-        AngularVelocity(Vec3::new(2.5, 3.5, 1.5))
-        Collider::cuboid(1.0, 1.0, 1.0)
-        Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
-        MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
-        Transform::from_xyz(0.0, 0.5, -10.0)
-        --
-        DirectionalLight {
-            illuminance: light_consts::lux::OVERCAST_DAY,
-            shadow_maps_enabled: true,
-        }
-        Transform::from_xyz(2.0, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y)
-        --
-    }
 }
 
 fn asset_loaded(mut images: ResMut<Assets<Image>>, skyboxes: Query<&mut Skybox>) {

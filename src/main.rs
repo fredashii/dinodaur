@@ -1,4 +1,4 @@
-use avian3d::{PhysicsPlugins, debug_render::PhysicsDebugPlugin};
+use avian3d::{PhysicsPlugins, debug_render::PhysicsDebugPlugin, dynamics::integrator::Gravity};
 use bevy::prelude::*;
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 
@@ -38,6 +38,7 @@ fn main() {
         .add_plugins((PhysicsPlugins::default(), PhysicsDebugPlugin))
         .add_plugins(EguiPlugin::default())
         .add_plugins(WorldInspectorPlugin::new())
+        .insert_resource(Gravity(Vec3::NEG_Y * 50.0))
         // Insert as resource the initial value for the settings resources
         .insert_resource(DisplayQuality::Medium)
         .insert_resource(Volume(7))
