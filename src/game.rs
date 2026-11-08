@@ -27,7 +27,7 @@ pub fn game_plugin(app: &mut App) {
         .add_systems(Update, move_camera.run_if(in_state(GameState::Game)))
         .add_systems(Update, asset_loaded.run_if(in_state(GameState::Game)))
         .add_systems(Update, get_collisions.run_if(in_state(GameState::Game)))
-        // .add_systems(Update, keyboard_input.run_if(in_state(GameState::Game)));
+        .add_systems(Update, start_animation.run_if(in_state(GameState::Game)))
         .add_systems(
             Update,
             handle_mouse_motion.run_if(in_state(GameState::Game)),
@@ -54,6 +54,32 @@ const ROAD_LENGTH: f32 = 10000.0;
 
 const ACCELERATION: f32 = 5.0;
 const DEACCELERATION: f32 = 1000.0;
+
+const ANIMATION_RUN: usize = 0;
+const ANIMATION_BITE: usize = 1;
+const ANIMATION_ROAR: usize = 2;
+const ANIMATION_ATTACK: usize = 3;
+const ANIMATION_IDLE: usize = 4;
+
+
+fn start_animation(
+    mut commands: Commands,
+    mut players: Query<(Entity, &mut AnimationPlayer), Added<AnimationPlayer>>,
+    asset_server: Res<AssetServer>,
+    mut graphs: ResMut<Assets<AnimationGraph>>,
+) {
+    for (enity, mut player) in &mut players {
+        let (graph, animation_to_play) = AnimationGraph::from_clip(
+            asset_server.load(GltfAssetLabel::Animation(ANIMATION_RUN).from_asset("models/dinosaur.glb")),
+        );
+
+        commands
+            .entity(enity)
+            .insert(AnimationGraphHandle(graphs.add(graph)));
+
+        player.play(animation_to_play).repeat().set_speed(1.0);
+    }
+}
 
 fn get_collisions(
     mut query: Query<(&CollidingEntities, &mut Player), With<Player>>,
@@ -283,41 +309,41 @@ fn game_setup(
 /// set up a simple 3D scene
 fn scene() -> impl SceneList {
     bsn_list! {
-            #Cube
-            RigidBody::Dynamic
-            Friction{static_coefficient: 0.0, dynamic_coefficient: 0.0, combine_rule: CoefficientCombine::Min}
-            Player{
-                time: 0.0
-            }
-            DespawnOnExit::<GameState>(GameState::Game)
-            // Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
-            // MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
-            Children [
-                WorldAssetRoot("models/dinosaur.glb#Scene0")
-                Transform::from_xyz(0.0, -0.5, 0.0)
-                .with_scale(Vec3::splat(1.0))
-                .with_rotation(Quat::from_rotation_y(std::f32::consts::PI) * Quat::from_rotation_x(std::f32::consts::PI/-6.0))
-            ]
-            Transform::from_xyz(0.0, 0.5, 0.0)
-            Collider::sphere(0.5)
-            LockedAxes::new().lock_rotation_x().lock_rotation_y().lock_rotation_z()
-            LinearVelocity(Vec3::new(0.0, 0.0, -15.0))
-            CollidingEntities::default()
-            --
-            RigidBody::Static
-            AngularVelocity(Vec3::new(2.5, 3.5, 1.5))
-            Collider::cuboid(1.0, 1.0, 1.0)
-            Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
-            MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
-            Transform::from_xyz(0.0, 0.5, -10.0)
-            --
-            DirectionalLight {
-                illuminance: light_consts::lux::OVERCAST_DAY,
-                shadow_maps_enabled: true,
-            }
-            Transform::from_xyz(2.0, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y)
-            --
+        #Cube
+        RigidBody::Dynamic
+        Friction{static_coefficient: 0.0, dynamic_coefficient: 0.0, combine_rule: CoefficientCombine::Min}
+        Player{
+            time: 0.0
         }
+        DespawnOnExit::<GameState>(GameState::Game)
+        // Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
+        // MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
+        Children [
+            WorldAssetRoot("models/dinosaur.glb#Scene0")
+            Transform::from_xyz(0.0, -0.5, 0.0)
+            .with_scale(Vec3::splat(1.0))
+            .with_rotation(Quat::from_rotation_y(std::f32::consts::PI) * Quat::from_rotation_x(std::f32::consts::PI/-6.0))
+        ]
+        Transform::from_xyz(0.0, 0.5, 0.0)
+        Collider::sphere(0.5)
+        LockedAxes::new().lock_rotation_x().lock_rotation_y().lock_rotation_z()
+        LinearVelocity(Vec3::new(0.0, 0.0, -15.0))
+        CollidingEntities::default()
+        --
+        RigidBody::Static
+        AngularVelocity(Vec3::new(2.5, 3.5, 1.5))
+        Collider::cuboid(1.0, 1.0, 1.0)
+        Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
+        MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
+        Transform::from_xyz(0.0, 0.5, -10.0)
+        --
+        DirectionalLight {
+            illuminance: light_consts::lux::OVERCAST_DAY,
+            shadow_maps_enabled: true,
+        }
+        Transform::from_xyz(2.0, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y)
+        --
+    }
 }
 
 fn asset_loaded(mut images: ResMut<Assets<Image>>, skyboxes: Query<&mut Skybox>) {
