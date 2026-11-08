@@ -23,8 +23,8 @@ use super::{GameState, TEXT_COLOR};
 // display the current settings for 5 seconds before returning to the menu
 pub fn game_plugin(app: &mut App) {
     app.add_systems(OnEnter(GameState::Game), game_setup)
-        .add_systems(Update, move_box.run_if(in_state(GameState::Game)))
-        .add_systems(Update, move_camera.run_if(in_state(GameState::Game)))
+        .add_systems(Update, adjust_player_velocity_z.run_if(in_state(GameState::Game)))
+        .add_systems(Update, camera_follows_player.run_if(in_state(GameState::Game)))
         .add_systems(Update, asset_loaded.run_if(in_state(GameState::Game)))
         .add_systems(Update, get_collisions.run_if(in_state(GameState::Game)))
         .add_systems(Update, start_animation.run_if(in_state(GameState::Game)))
@@ -94,7 +94,7 @@ fn get_collisions(
     }
 }
 
-fn move_box(mut query: Query<(&mut LinearVelocity, &mut Player), With<Player>>, 
+fn adjust_player_velocity_z(mut query: Query<(&mut LinearVelocity, &mut Player), With<Player>>, 
 mut animation_players: Query<&mut AnimationPlayer>, 
 time: Res<Time>) {
     for (mut velocity, mut player) in &mut query {
@@ -124,6 +124,9 @@ time: Res<Time>) {
         if animation_speed > 4.0 {
             animation_speed = 4.0;
         }
+        if animation_speed < 1.0{
+            animation_speed = 1.0;
+        }
         for mut animation_player in &mut animation_players {
             for (_, animation) in animation_player.playing_animations_mut() {
                 animation.set_speed(animation_speed);
@@ -132,7 +135,7 @@ time: Res<Time>) {
     }
 }
 
-fn move_camera(
+fn camera_follows_player(
     mut camera_query: Query<&mut Transform, With<Camera3d>>,
     box_query: Query<&Transform, (With<Player>, Without<Camera3d>)>,
 ) {
@@ -160,7 +163,7 @@ fn handle_mouse_motion(
 
     let delta = accumulated_motion.delta;
     if delta != Vec2::ZERO {
-        velocity.x += delta.x * 0.3;
+        velocity.x += delta.x * 0.5;
         velocity.x = velocity.x.clamp(-10.0, 10.0)
     } else {
         if velocity.x.abs() > 0.0 {
