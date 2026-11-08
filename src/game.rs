@@ -94,7 +94,9 @@ fn get_collisions(
     }
 }
 
-fn move_box(mut query: Query<(&mut LinearVelocity, &mut Player), With<Player>>, time: Res<Time>) {
+fn move_box(mut query: Query<(&mut LinearVelocity, &mut Player), With<Player>>, 
+mut animation_players: Query<&mut AnimationPlayer>, 
+time: Res<Time>) {
     for (mut velocity, mut player) in &mut query {
         if velocity.y < -5.0 {
             velocity.y = -5.0;
@@ -116,6 +118,16 @@ fn move_box(mut query: Query<(&mut LinearVelocity, &mut Player), With<Player>>, 
             player.time -= 1.0 * time.delta_secs();
         } else if player.time < 0.0 {
             player.time = 0.0;
+        }
+
+        let mut animation_speed = velocity.z.abs() * 0.1;
+        if animation_speed > 4.0 {
+            animation_speed = 4.0;
+        }
+        for mut animation_player in &mut animation_players {
+            for (_, animation) in animation_player.playing_animations_mut() {
+                animation.set_speed(animation_speed);
+            }
         }
     }
 }
