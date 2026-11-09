@@ -17,25 +17,31 @@ use bevy::{
 use crate::menu;
 use avian3d::prelude::*;
 
-use super::{GameState, TEXT_COLOR};
+use super::{GamePhase, GameState, TEXT_COLOR};
 
 // This plugin will contain the game. In this case, it's just be a screen that will
 // display the current settings for 5 seconds before returning to the menu
 pub fn game_plugin(app: &mut App) {
     app.add_systems(OnEnter(GameState::Game), game_setup)
-        .add_systems(Update, update_player.run_if(in_state(GameState::Game)))
         .add_systems(
             Update,
-            camera_follows_player.run_if(in_state(GameState::Game)),
+            mouse_click_system.run_if(in_state(GamePhase::PreGame)),
+        )
+        .add_systems(Update, update_player.run_if(in_state(GamePhase::InGame)))
+        .add_systems(
+            Update,
+            camera_follows_player.run_if(in_state(GamePhase::InGame)),
         )
         .add_systems(Update, asset_loaded.run_if(in_state(GameState::Game)))
-        .add_systems(Update, get_collisions.run_if(in_state(GameState::Game)))
-        .add_systems(Update, start_player_run_animation.run_if(in_state(GameState::Game)))
-                .add_systems(Update, update_animation.run_if(in_state(GameState::Game)))
-
+        .add_systems(Update, get_collisions.run_if(in_state(GamePhase::InGame)))
         .add_systems(
             Update,
-            handle_mouse_motion.run_if(in_state(GameState::Game)),
+            start_player_run_animation.run_if(in_state(GamePhase::InGame)),
+        )
+        .add_systems(Update, update_animation.run_if(in_state(GamePhase::InGame)))
+        .add_systems(
+            Update,
+            handle_mouse_motion.run_if(in_state(GamePhase::InGame)),
         );
 }
 
@@ -69,6 +75,16 @@ const ANIMATION_BITE: usize = 1;
 const ANIMATION_ROAR: usize = 2;
 const ANIMATION_ATTACK: usize = 3;
 const ANIMATION_IDLE: usize = 4;
+
+fn mouse_click_system(
+    mouse_input: Res<ButtonInput<MouseButton>>,
+    mut game_phase: ResMut<NextState<GamePhase>>,
+) {
+    if mouse_input.just_pressed(MouseButton::Left) {
+        info!("Left mouse button was just pressed!");
+        game_phase.set(GamePhase::InGame)
+    }
+}
 
 fn start_player_run_animation(
     mut commands: Commands,
@@ -210,7 +226,29 @@ fn game_setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut cursor_options: Single<&mut CursorOptions>,
+    mut mouse_input: ResMut<ButtonInput<MouseButton>>,
 ) {
+    mouse_input.clear_just_pressed(MouseButton::Left);
+
+    commands.spawn((
+        DespawnOnExit(GamePhase::PreGame),
+        Node {
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            position_type: PositionType::Relative,
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            ..default()
+        },
+        children![(
+            Text::new("Click to start!"),
+            TextFont {
+                font_size: FontSize::Px(40.0),
+                ..default()
+            }
+        )],
+    ));
+
     cursor_options.visible = false;
     cursor_options.grab_mode = bevy::window::CursorGrabMode::Locked;
 
@@ -370,7 +408,7 @@ fn scene() -> impl SceneList {
         Transform::from_xyz(0.0, 0.5, 0.0)
         Collider::sphere(0.5)
         LockedAxes::new().lock_rotation_x().lock_rotation_y().lock_rotation_z()
-        LinearVelocity(Vec3::new(0.0, 0.0, -15.0))
+        LinearVelocity(Vec3::new(0.0, 0.0, 0.0))
         CollidingEntities::default()
         --
         #Blocker

@@ -21,6 +21,8 @@ struct OnSplashScreen;
 struct SplashTimer(Timer);
 
 fn splash_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.spawn((Camera2d, DespawnOnExit(GameState::Splash)));
+
     let icon = asset_server.load("branding/dinosaur.png");
     // Display the logo
     commands.spawn((

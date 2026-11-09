@@ -181,7 +181,8 @@ fn on_value_change_setting_radio<
     }
 }
 
-fn menu_setup(mut menu_state: ResMut<NextState<MenuState>>) {
+fn menu_setup(mut commands: Commands, mut menu_state: ResMut<NextState<MenuState>>) {
+    commands.spawn((Camera2d, DespawnOnExit(GameState::Menu)));
     menu_state.set(MenuState::Main);
 }
 

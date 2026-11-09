@@ -17,6 +17,14 @@ enum GameState {
     Game,
 }
 
+#[derive(SubStates, Clone, Copy, Default, Eq, PartialEq, Debug, Hash)]
+#[source(GameState = GameState::Game)]
+enum GamePhase {
+    #[default]
+    PreGame,
+    InGame,
+}
+
 // One of the two settings that can be set through the menu. It will be a resource in the app
 #[derive(Resource, Debug, PartialEq, Eq, Clone, Copy)]
 enum DisplayQuality {
@@ -44,12 +52,8 @@ fn main() {
         .insert_resource(Volume(7))
         // Declare the game state, whose starting value is determined by the `Default` trait
         .init_state::<GameState>()
-        .add_systems(Startup, setup)
+        .add_sub_state::<GamePhase>()
         // Adds the plugins for each state
         .add_plugins((splash::splash_plugin, menu::menu_plugin, game::game_plugin))
         .run();
-}
-
-fn setup(mut commands: Commands) {
-    commands.spawn(Camera2d);
 }
