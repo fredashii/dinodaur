@@ -236,7 +236,7 @@ fn main_menu_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             children![
                 // Display the game name
                 (
-                    Text::new("Dinodaur"),
+                    Text::new("DinodaurDash"),
                     TextFont {
                         font_size: FontSize::Px(67.0),
                         ..default()
