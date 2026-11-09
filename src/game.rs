@@ -23,11 +23,16 @@ use super::{GameState, TEXT_COLOR};
 // display the current settings for 5 seconds before returning to the menu
 pub fn game_plugin(app: &mut App) {
     app.add_systems(OnEnter(GameState::Game), game_setup)
-        .add_systems(Update, adjust_player_velocity_z.run_if(in_state(GameState::Game)))
-        .add_systems(Update, camera_follows_player.run_if(in_state(GameState::Game)))
+        .add_systems(Update, update_player.run_if(in_state(GameState::Game)))
+        .add_systems(
+            Update,
+            camera_follows_player.run_if(in_state(GameState::Game)),
+        )
         .add_systems(Update, asset_loaded.run_if(in_state(GameState::Game)))
         .add_systems(Update, get_collisions.run_if(in_state(GameState::Game)))
-        .add_systems(Update, start_animation.run_if(in_state(GameState::Game)))
+        .add_systems(Update, start_player_run_animation.run_if(in_state(GameState::Game)))
+                .add_systems(Update, update_animation.run_if(in_state(GameState::Game)))
+
         .add_systems(
             Update,
             handle_mouse_motion.run_if(in_state(GameState::Game)),
@@ -41,10 +46,14 @@ struct OnGameScreen;
 #[derive(Component, Clone, Default)]
 struct Player {
     time: f32,
+    health: f32,
 }
 
 #[derive(Component, Clone, Default)]
 struct RampMarker;
+
+#[derive(Component, Clone, Default)]
+struct EnemyMarker;
 
 const CUBEMAPS: &[(&str, CompressedImageFormats)] =
     &[("textures/cubemap.png", CompressedImageFormats::NONE)];
@@ -61,8 +70,7 @@ const ANIMATION_ROAR: usize = 2;
 const ANIMATION_ATTACK: usize = 3;
 const ANIMATION_IDLE: usize = 4;
 
-
-fn start_animation(
+fn start_player_run_animation(
     mut commands: Commands,
     mut players: Query<(Entity, &mut AnimationPlayer), Added<AnimationPlayer>>,
     asset_server: Res<AssetServer>,
@@ -70,7 +78,8 @@ fn start_animation(
 ) {
     for (enity, mut player) in &mut players {
         let (graph, animation_to_play) = AnimationGraph::from_clip(
-            asset_server.load(GltfAssetLabel::Animation(ANIMATION_RUN).from_asset("models/dinosaur.glb")),
+            asset_server
+                .load(GltfAssetLabel::Animation(ANIMATION_RUN).from_asset("models/dinosaur.glb")),
         );
 
         commands
@@ -84,52 +93,71 @@ fn start_animation(
 fn get_collisions(
     mut query: Query<(&CollidingEntities, &mut Player), With<Player>>,
     ramps: Query<Entity, With<RampMarker>>,
+    enemies: Query<Entity, With<EnemyMarker>>,
 ) {
     for (colliding_entities, mut player) in &mut query {
         for entity in colliding_entities.iter() {
             if ramps.get(*entity).is_ok() {
                 player.time = 5.0;
+            } else if enemies.get(*entity).is_ok() {
+                player.health = 0.0;
             }
         }
     }
 }
 
-fn adjust_player_velocity_z(mut query: Query<(&mut LinearVelocity, &mut Player), With<Player>>, 
-mut animation_players: Query<&mut AnimationPlayer>, 
-time: Res<Time>) {
+fn update_player(
+    mut query: Query<(&mut LinearVelocity, &mut Player), With<Player>>,
+    time: Res<Time>,
+) {
     for (mut velocity, mut player) in &mut query {
-        if velocity.y < -5.0 {
-            velocity.y = -5.0;
-        }
-        if player.time == 0.0 {
-            if velocity.z >= -20.0 {
-                velocity.z -= ACCELERATION * time.delta_secs();
-                if velocity.z < -20.0 {
-                    velocity.z = -20.0
-                }
-            } else {
-                velocity.z += DEACCELERATION * time.delta_secs();
-                if velocity.z > -20.0 {
-                    velocity.z = -20.0
-                }
+        if player.health <= 0.0 {
+            velocity.z = 0.0;
+        } else {
+            if velocity.y < -5.0 {
+                velocity.y = -5.0;
             }
-        } else if player.time > 0.0 {
-            velocity.z -= 200.0 * time.delta_secs();
-            player.time -= 1.0 * time.delta_secs();
-        } else if player.time < 0.0 {
-            player.time = 0.0;
+            if player.time == 0.0 {
+                if velocity.z >= -20.0 {
+                    velocity.z -= ACCELERATION * time.delta_secs();
+                    if velocity.z < -20.0 {
+                        velocity.z = -20.0
+                    }
+                } else {
+                    velocity.z += DEACCELERATION * time.delta_secs();
+                    if velocity.z > -20.0 {
+                        velocity.z = -20.0
+                    }
+                }
+            } else if player.time > 0.0 {
+                velocity.z -= 200.0 * time.delta_secs();
+                player.time -= 1.0 * time.delta_secs();
+            } else if player.time < 0.0 {
+                player.time = 0.0;
+            }
         }
+    }
+}
 
+fn update_animation(
+    mut query: Query<(&mut LinearVelocity, &mut Player), With<Player>>,
+    mut animation_players: Query<&mut AnimationPlayer>,
+) {
+    for (velocity, player) in &mut query {
         let mut animation_speed = velocity.z.abs() * 0.1;
         if animation_speed > 4.0 {
             animation_speed = 4.0;
         }
-        if animation_speed < 1.0{
+        if animation_speed < 1.0 {
             animation_speed = 1.0;
         }
+
         for mut animation_player in &mut animation_players {
             for (_, animation) in animation_player.playing_animations_mut() {
                 animation.set_speed(animation_speed);
+                if player.health <= 0.0 {
+                    animation.set_speed(0.0);
+                }
             }
         }
     }
@@ -185,16 +213,6 @@ fn game_setup(
 ) {
     cursor_options.visible = false;
     cursor_options.grab_mode = bevy::window::CursorGrabMode::Locked;
-
-    // commands.spawn((
-    //     // This is equivalent to "models/FlightHelmet/FlightHelmet.gltf#Scene0"
-    //     // The `#Scene0` label here is very important because it tells bevy to load the first scene in the glTF file.
-    //     // If this isn't specified bevy doesn't know which part of th/Users/fredashi/Downloads/freddy_fazbear_... (1)/texturese glTF file to load.
-    //     WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/freddie.glb"))),
-    //     // You can use the transform to give it a position
-    //     Transform::from_xyz(2.0, 0.0, -60.0),
-    //     DespawnOnExit(GameState::Game),
-    // ));
 
     let texture_handle = asset_server
         .load_builder()
@@ -292,6 +310,17 @@ fn game_setup(
         Transform::from_xyz(0.0, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y),
         skybox,
     ));
+
+    commands.spawn((
+        RigidBody::Static,
+        AngularVelocity(Vec3::new(2.5, 3.5, 1.5)),
+        Collider::cuboid(1.0, 1.0, 1.0),
+        Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+        MeshMaterial3d::<StandardMaterial>(materials.add(Color::srgb_u8(255, 144, 255))),
+        Transform::from_xyz(-3.0, 0.5, -30.0),
+        EnemyMarker,
+    ));
+
     commands.spawn((
         DespawnOnExit(GameState::Game),
         Node {
@@ -328,11 +357,10 @@ fn scene() -> impl SceneList {
         RigidBody::Dynamic
         Friction{static_coefficient: 0.0, dynamic_coefficient: 0.0, combine_rule: CoefficientCombine::Min}
         Player{
-            time: 0.0
+            time: 0.0,
+            health: 100.0,
         }
         DespawnOnExit::<GameState>(GameState::Game)
-        // Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
-        // MeshMaterial3d::<StandardMaterial>(asset_value(Color::srgb_u8(124, 144, 255)))
         Children [
             WorldAssetRoot("models/dinosaur.glb#Scene0")
             Transform::from_xyz(0.0, -0.5, 0.0)
@@ -345,6 +373,7 @@ fn scene() -> impl SceneList {
         LinearVelocity(Vec3::new(0.0, 0.0, -15.0))
         CollidingEntities::default()
         --
+        #Blocker
         RigidBody::Static
         AngularVelocity(Vec3::new(2.5, 3.5, 1.5))
         Collider::cuboid(1.0, 1.0, 1.0)
