@@ -27,6 +27,7 @@ pub fn game_plugin(app: &mut App) {
             Update,
             mouse_click_system.run_if(in_state(GamePhase::PreGame)),
         )
+        .add_systems(Update, escape_system.run_if(in_state(GamePhase::InGame)))
         .add_systems(Update, update_player.run_if(in_state(GamePhase::InGame)))
         .add_systems(
             Update,
@@ -75,6 +76,26 @@ const ANIMATION_BITE: usize = 1;
 const ANIMATION_ROAR: usize = 2;
 const ANIMATION_ATTACK: usize = 3;
 const ANIMATION_IDLE: usize = 4;
+
+fn escape_system(
+    input: Res<ButtonInput<KeyCode>>,
+    mut game_phase: ResMut<NextState<GamePhase>>,
+    mut animation_players: Query<&mut AnimationPlayer>,
+    mut time: ResMut<Time<Physics>>,
+    mut cursor_options: Single<&mut CursorOptions>,
+) {
+    if input.just_pressed(KeyCode::Escape) {
+        game_phase.set(GamePhase::PauseGame);
+        time.pause(); // Stop avian physics. 
+        for mut animation_player in &mut animation_players {
+            for (_, animation) in animation_player.playing_animations_mut() {
+                animation.pause();
+            }
+        }
+        cursor_options.visible = true;
+        cursor_options.grab_mode = bevy::window::CursorGrabMode::None;
+    }
+}
 
 fn mouse_click_system(
     mouse_input: Res<ButtonInput<MouseButton>>,
@@ -227,7 +248,11 @@ fn game_setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut cursor_options: Single<&mut CursorOptions>,
     mut mouse_input: ResMut<ButtonInput<MouseButton>>,
+    mut game_phase: ResMut<NextState<GamePhase>>,
+    mut time: ResMut<Time<Physics>>,
 ) {
+    time.unpause();
+
     mouse_input.clear_just_pressed(MouseButton::Left);
 
     commands.spawn((
@@ -402,7 +427,7 @@ fn scene() -> impl SceneList {
         Children [
             WorldAssetRoot("models/dinosaur.glb#Scene0")
             Transform::from_xyz(0.0, -0.5, 0.0)
-            .with_scale(Vec3::splat(1.0))
+            .with_scale(Vec3::splat(1.5))
             .with_rotation(Quat::from_rotation_y(std::f32::consts::PI) * Quat::from_rotation_x(std::f32::consts::PI/-6.0))
         ]
         Transform::from_xyz(0.0, 0.5, 0.0)

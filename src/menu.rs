@@ -9,6 +9,8 @@ use bevy::{
     ui_widgets::{Activate, ActivateOnPress, Button, RadioButton, RadioGroup, ValueChange},
 };
 
+use crate::GamePhase;
+
 use super::{DisplayQuality, GameState, Setting, TEXT_COLOR, Volume};
 
 // This plugin manages the menu, with 5 different screens:
@@ -533,6 +535,7 @@ fn on_button_activate_update_states(
     mut app_exit_writer: MessageWriter<AppExit>,
     mut menu_state: ResMut<NextState<MenuState>>,
     mut game_state: ResMut<NextState<GameState>>,
+    mut game_phase: ResMut<NextState<GamePhase>>,
 ) {
     bevy::log::info!("Inside the on button activate update status");
     if let Ok(menu_button_action) = action_q.get(event.entity) {
@@ -542,6 +545,7 @@ fn on_button_activate_update_states(
             }
             MenuButtonAction::Play => {
                 game_state.set(GameState::Game);
+                game_phase.set(GamePhase::PreGame);
                 menu_state.set(MenuState::Disabled);
             }
             MenuButtonAction::Settings => menu_state.set(MenuState::Settings),
