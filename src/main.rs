@@ -2,6 +2,8 @@ use avian3d::{PhysicsPlugins, debug_render::PhysicsDebugPlugin, dynamics::integr
 use bevy::prelude::*;
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 
+// Animated sky for the game screen (src/galaxy.rs).
+mod galaxy;
 mod game;
 mod menu;
 mod splash;
@@ -55,6 +57,12 @@ fn main() {
         .init_state::<GameState>()
         .add_sub_state::<GamePhase>()
         // Adds the plugins for each state
-        .add_plugins((splash::splash_plugin, menu::menu_plugin, game::game_plugin))
+        .add_plugins((
+            splash::splash_plugin,
+            menu::menu_plugin,
+            game::game_plugin,
+            // Slowly rotates the skybox.
+            galaxy::galaxy_plugin,
+        ))
         .run();
 }
