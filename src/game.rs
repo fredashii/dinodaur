@@ -27,7 +27,8 @@ pub fn game_plugin(app: &mut App) {
             Update,
             mouse_click_system.run_if(in_state(GamePhase::PreGame)),
         )
-        .add_systems(Update, escape_system.run_if(in_state(GamePhase::InGame)))
+        .add_systems(Update, pause_game.run_if(in_state(GamePhase::InGame)))
+        .add_systems(Update, resume_game.run_if(in_state(GamePhase::PauseGame)))
         .add_systems(Update, update_player.run_if(in_state(GamePhase::InGame)))
         .add_systems(
             Update,
@@ -77,12 +78,13 @@ const ANIMATION_ROAR: usize = 2;
 const ANIMATION_ATTACK: usize = 3;
 const ANIMATION_IDLE: usize = 4;
 
-fn escape_system(
+fn pause_game(
     input: Res<ButtonInput<KeyCode>>,
     mut game_phase: ResMut<NextState<GamePhase>>,
     mut animation_players: Query<&mut AnimationPlayer>,
     mut time: ResMut<Time<Physics>>,
     mut cursor_options: Single<&mut CursorOptions>,
+    state: Res<State<GamePhase>>,
 ) {
     if input.just_pressed(KeyCode::Escape) {
         game_phase.set(GamePhase::PauseGame);
@@ -94,6 +96,26 @@ fn escape_system(
         }
         cursor_options.visible = true;
         cursor_options.grab_mode = bevy::window::CursorGrabMode::None;
+    }
+}
+
+fn resume_game(
+    input: Res<ButtonInput<KeyCode>>,
+    mut game_phase: ResMut<NextState<GamePhase>>,
+    mut animation_players: Query<&mut AnimationPlayer>,
+    mut time: ResMut<Time<Physics>>,
+    mut cursor_options: Single<&mut CursorOptions>,
+) {
+    if input.just_pressed(KeyCode::Escape) {
+        game_phase.set(GamePhase::InGame);
+        time.unpause(); // Resume avian physics.
+        for mut animation_player in &mut animation_players {
+            for (_, animation) in animation_player.playing_animations_mut() {
+                animation.resume();
+            }
+        }
+        cursor_options.visible = false;
+        cursor_options.grab_mode = bevy::window::CursorGrabMode::Locked;
     }
 }
 
