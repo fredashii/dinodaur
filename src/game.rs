@@ -55,10 +55,15 @@ struct OnGameScreen;
 struct Player {
     time: f32,
     health: f32,
+    food_counter: i32,
 }
 
 #[derive(Component, Clone, Default)]
 struct RampMarker;
+
+#[derive(Component, Clone, Default)]
+struct FoodMarker;
+
 
 #[derive(Component, Clone, Default)]
 struct EnemyMarker;
@@ -153,6 +158,8 @@ fn get_collisions(
     mut query: Query<(&CollidingEntities, &mut Player), With<Player>>,
     ramps: Query<Entity, With<RampMarker>>,
     enemies: Query<Entity, With<EnemyMarker>>,
+    food: Query<Entity, With<FoodMarker>>,
+    mut commands: Commands,
 ) {
     for (colliding_entities, mut player) in &mut query {
         for entity in colliding_entities.iter() {
@@ -160,6 +167,10 @@ fn get_collisions(
                 player.time = 5.0;
             } else if enemies.get(*entity).is_ok() {
                 player.health = 0.0;
+            } else if food.get(*entity).is_ok(){
+                player.food_counter += 1;
+                println!("player food {}", player.food_counter);
+                commands.entity(*entity).despawn();
             }
         }
     }
@@ -406,6 +417,25 @@ fn game_setup(
         EnemyMarker,
     ));
 
+    // A potato standing upright on the road, facing the camera.
+    // The image is 900x637, so keep that aspect ratio to avoid stretching it.
+    let potato_width =1.5;
+    let potato_height = 3.;
+    commands.spawn((
+        RigidBody::Static,
+        Sensor, 
+        Collider::cuboid(potato_width, potato_height, 0.2),
+        Mesh3d(meshes.add(Rectangle::new(potato_width, potato_height))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color_texture: Some(asset_server.load("textures/potato.png")),
+            alpha_mode: AlphaMode::Mask(0.5),
+            ..default()
+        })),
+        Transform::from_xyz(3.0, 1.5, -30.0),
+        DespawnOnExit(GameState::Game),
+        FoodMarker,
+    ));
+
     commands.spawn((
         DespawnOnExit(GameState::Game),
         Node {
@@ -444,6 +474,7 @@ fn scene() -> impl SceneList {
         Player{
             time: 0.0,
             health: 100.0,
+            food_counter: 0,
         }
         DespawnOnExit::<GameState>(GameState::Game)
         Children [
