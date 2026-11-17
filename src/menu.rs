@@ -78,10 +78,10 @@ struct OnDisplaySettingsMenuScreen;
 #[derive(Component)]
 struct OnSoundSettingsMenuScreen;
 
-const NORMAL_BUTTON: Color = Color::srgb_u8(235, 230, 122);
-const HOVERED_BUTTON: Color = Color::srgb(0.25, 0.25, 0.25);
-const HOVERED_PRESSED_BUTTON: Color = Color::srgb(0.25, 0.65, 0.25);
-const PRESSED_BUTTON: Color = Color::srgb(0.35, 0.75, 0.35);
+pub const NORMAL_BUTTON: Color = Color::srgb_u8(235, 230, 122);
+pub const HOVERED_BUTTON: Color = Color::srgb(0.25, 0.25, 0.25);
+pub const HOVERED_PRESSED_BUTTON: Color = Color::srgb(0.25, 0.65, 0.25);
+pub const PRESSED_BUTTON: Color = Color::srgb(0.35, 0.75, 0.35);
 
 // All actions that can be triggered from a button click
 #[derive(Component)]

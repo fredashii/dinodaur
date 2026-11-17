@@ -4,7 +4,16 @@ use bevy::{
     image::{
         CompressedImageFormats, ImageAddressMode, ImageLoaderSettings, ImageSampler,
         ImageSamplerDescriptor,
-    }, input::mouse::AccumulatedMouseMotion, light::Skybox, math::Affine2, prelude::*, render::render_resource::{TextureViewDescriptor, TextureViewDimension}, text::TextSection, ui_widgets::{ActivateOnPress, Button}, window::CursorOptions,
+    },
+    input::mouse::AccumulatedMouseMotion,
+    light::Skybox,
+    math::Affine2,
+    picking::hover::Hovered,
+    prelude::*,
+    render::render_resource::{TextureViewDescriptor, TextureViewDimension},
+    text::TextSection,
+    ui_widgets::{ActivateOnPress, Button},
+    window::CursorOptions,
 };
 
 use crate::menu;
@@ -60,7 +69,6 @@ struct FoodMarker;
 #[derive(Component, Clone, Default)]
 struct GameScoreMarker;
 
-
 #[derive(Component, Clone, Default)]
 struct EnemyMarker;
 
@@ -70,7 +78,7 @@ const CUBEMAPS: &[(&str, CompressedImageFormats)] =
 const ROAD_WIDTH: f32 = 10.0;
 const ROAD_LENGTH: f32 = 10000.0;
 
-const ACCELERATION: f32 = 5.0;
+const ACCELERATION: f32 = 20.0;
 const DEACCELERATION: f32 = 1000.0;
 
 const ANIMATION_RUN: usize = 0;
@@ -86,6 +94,7 @@ fn pause_game(
     mut time: ResMut<Time<Physics>>,
     mut cursor_options: Single<&mut CursorOptions>,
     state: Res<State<GamePhase>>,
+    mut commands: Commands,
 ) {
     if input.just_pressed(KeyCode::Escape) {
         game_phase.set(GamePhase::PauseGame);
@@ -97,6 +106,48 @@ fn pause_game(
         }
         cursor_options.visible = true;
         cursor_options.grab_mode = bevy::window::CursorGrabMode::None;
+
+        let button_node = Node {
+            width: px(300),
+            height: px(65),
+            margin: UiRect::all(px(20)),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            ..default()
+        };
+        let button_text_font = TextFont {
+            font_size: FontSize::Px(33.0),
+            ..default()
+        };
+        
+
+        commands.spawn((
+            DespawnOnExit(GamePhase::PauseGame),
+            Node {
+                width: percent(100),
+                height: percent(100),
+                // center children
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            OnGameScreen,
+            children![(
+                DespawnOnExit(GameState::Game),
+                Button,
+                ActivateOnPress,
+                Hovered::default(),
+                button_node.clone(),
+                menu::MenuButtonAction::BackToMainMenu,
+                BackgroundColor(menu::NORMAL_BUTTON),
+                children![(
+                    Text::new("Return to Main Menu"),
+                    TextLayout::justify(Justify::Center),
+                    button_text_font.clone(),
+                    TextColor(TEXT_COLOR),
+                )],
+            )],
+        ));
     }
 }
 
@@ -164,11 +215,13 @@ fn get_collisions(
                 player.time = 5.0;
             } else if enemies.get(*entity).is_ok() {
                 player.health = 0.0;
-            } else if food.get(*entity).is_ok(){
+            } else if food.get(*entity).is_ok() {
                 player.food_counter += 1;
                 println!("player food {}", player.food_counter);
                 commands.entity(*entity).despawn();
-                let mut game_score = game_score.single_mut().expect("There should only be 1 game score!!!!");
+                let mut game_score = game_score
+                    .single_mut()
+                    .expect("There should only be 1 game score!!!!");
                 *game_score.get_text_mut() = format!("Game Score: {}", player.food_counter);
             }
         }
@@ -260,8 +313,8 @@ fn handle_mouse_motion(
 
     let delta = accumulated_motion.delta;
     if delta != Vec2::ZERO {
-        velocity.x += delta.x * 0.5;
-        velocity.x = velocity.x.clamp(-10.0, 10.0)
+        velocity.x += delta.x * 0.1;
+        velocity.x = velocity.x.clamp(-13.0, 13.0)
     } else {
         if velocity.x.abs() > 0.0 {
             let sign = velocity.x.signum();
@@ -384,28 +437,6 @@ fn game_setup(
         RampMarker,
     ));
 
-    let button_node = Node {
-        width: px(300),
-        height: px(65),
-        margin: UiRect::all(px(20)),
-        justify_content: JustifyContent::Center,
-        align_items: AlignItems::Center,
-        ..default()
-    };
-    let button_text_font = TextFont {
-        font_size: FontSize::Px(33.0),
-        ..default()
-    };
-    let button_icon_node = Node {
-        width: px(30),
-        // This takes the icons out of the flexbox flow, to be positioned exactly
-        position_type: PositionType::Absolute,
-        // The icon will be close to the left border of the button
-        left: px(10),
-        ..default()
-    };
-    let right_icon = asset_server.load("textures/Game Icons/fairy.png");
-
     let cubemap_handle: Handle<Image> = asset_server.load(CUBEMAPS[0].0);
 
     let skybox = Skybox {
@@ -438,11 +469,11 @@ fn game_setup(
 
     // A potato standing upright on the road, facing the camera.
     // The image is 900x637, so keep that aspect ratio to avoid stretching it.
-    let potato_width =1.5;
+    let potato_width = 1.5;
     let potato_height = 3.;
     commands.spawn((
         RigidBody::Static,
-        Sensor, 
+        Sensor,
         Collider::cuboid(potato_width, potato_height, 0.2),
         Mesh3d(meshes.add(Rectangle::new(potato_width, potato_height))),
         MeshMaterial3d(materials.add(StandardMaterial {
@@ -453,34 +484,6 @@ fn game_setup(
         Transform::from_xyz(3.0, 1.5, -30.0),
         DespawnOnExit(GameState::Game),
         FoodMarker,
-    ));
-
-    commands.spawn((
-        DespawnOnExit(GameState::Game),
-        Node {
-            width: percent(100),
-            height: percent(100),
-            // center children
-            // align_items: AlignItems::Center,
-            justify_content: JustifyContent::Center,
-            ..default()
-        },
-        OnGameScreen,
-        children![(
-            DespawnOnExit(GameState::Game),
-            Button,
-            ActivateOnPress,
-            button_node.clone(),
-            menu::MenuButtonAction::BackToMainMenu,
-            children![
-                (ImageNode::new(right_icon), button_icon_node.clone()),
-                (
-                    Text::new("Return to Main Menu"),
-                    button_text_font.clone(),
-                    TextColor(TEXT_COLOR),
-                ),
-            ],
-        )],
     ));
 }
 
