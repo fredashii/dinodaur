@@ -4,14 +4,7 @@ use bevy::{
     image::{
         CompressedImageFormats, ImageAddressMode, ImageLoaderSettings, ImageSampler,
         ImageSamplerDescriptor,
-    },
-    input::mouse::AccumulatedMouseMotion,
-    light::Skybox,
-    math::Affine2,
-    prelude::*,
-    render::render_resource::{TextureViewDescriptor, TextureViewDimension},
-    ui_widgets::{ActivateOnPress, Button},
-    window::CursorOptions,
+    }, input::mouse::AccumulatedMouseMotion, light::Skybox, math::Affine2, prelude::*, render::render_resource::{TextureViewDescriptor, TextureViewDimension}, text::TextSection, ui_widgets::{ActivateOnPress, Button}, window::CursorOptions,
 };
 
 use crate::menu;
@@ -63,6 +56,9 @@ struct RampMarker;
 
 #[derive(Component, Clone, Default)]
 struct FoodMarker;
+
+#[derive(Component, Clone, Default)]
+struct GameScoreMarker;
 
 
 #[derive(Component, Clone, Default)]
@@ -159,6 +155,7 @@ fn get_collisions(
     ramps: Query<Entity, With<RampMarker>>,
     enemies: Query<Entity, With<EnemyMarker>>,
     food: Query<Entity, With<FoodMarker>>,
+    mut game_score: Query<&mut Text, With<GameScoreMarker>>,
     mut commands: Commands,
 ) {
     for (colliding_entities, mut player) in &mut query {
@@ -171,6 +168,8 @@ fn get_collisions(
                 player.food_counter += 1;
                 println!("player food {}", player.food_counter);
                 commands.entity(*entity).despawn();
+                let mut game_score = game_score.single_mut().expect("There should only be 1 game score!!!!");
+                *game_score.get_text_mut() = format!("Game Score: {}", player.food_counter);
             }
         }
     }
@@ -304,6 +303,26 @@ fn game_setup(
                 font_size: FontSize::Px(40.0),
                 ..default()
             }
+        )],
+    ));
+
+    commands.spawn((
+        DespawnOnExit(GameState::Game),
+        Node {
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            position_type: PositionType::Relative,
+            align_items: AlignItems::Start,
+            justify_content: JustifyContent::End,
+            ..default()
+        },
+        children![(
+            Text::new("Game Score: 0"),
+            TextFont {
+                font_size: FontSize::Px(40.0),
+                ..default()
+            },
+            GameScoreMarker,
         )],
     ));
 
