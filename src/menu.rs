@@ -79,7 +79,7 @@ struct OnDisplaySettingsMenuScreen;
 struct OnSoundSettingsMenuScreen;
 
 pub const NORMAL_BUTTON: Color = Color::srgb_u8(235, 230, 122);
-pub const HOVERED_BUTTON: Color = Color::srgb(0.25, 0.25, 0.25);
+pub const HOVERED_BUTTON: Color = Color::srgb_u8(217, 197, 61);
 pub const HOVERED_PRESSED_BUTTON: Color = Color::srgb(0.25, 0.65, 0.25);
 pub const PRESSED_BUTTON: Color = Color::srgb(0.35, 0.75, 0.35);
 
