@@ -80,7 +80,7 @@ const ROAD_LENGTH: f32 = 10000.0;
 
 const MOVEMENT_SIDE_SPEED_SCALAR: f32 = 0.013;
 const MAX_SIDEWAYS_SPEED: f32 = 40.0;
-const SIDEWAYS_RESPONSIVENESS: f32 = 20.0;
+const DECAY_RATE: f32 = 20.0;
 
 const ACCELERATION: f32 = 20.0;
 const DEACCELERATION: f32 = 1000.0;
@@ -323,7 +323,7 @@ fn handle_mouse_motion(
     let mouse_speed = accumulated_motion.delta.x / dt;
     let target = (mouse_speed * MOVEMENT_SIDE_SPEED_SCALAR).clamp(-MAX_SIDEWAYS_SPEED, MAX_SIDEWAYS_SPEED);
 
-    velocity.x.smooth_nudge(&target, SIDEWAYS_RESPONSIVENESS, dt);
+    velocity.x.smooth_nudge(&target, DECAY_RATE, dt);
 
     if target == 0.0 && velocity.x.abs() < 0.1 {
         velocity.x = 0.0;
