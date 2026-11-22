@@ -75,12 +75,19 @@ struct EnemyMarker;
 const CUBEMAPS: &[(&str, CompressedImageFormats)] =
     &[("textures/cubemap.png", CompressedImageFormats::NONE)];
 
-const ROAD_WIDTH: f32 = 10.0;
+const LANES: usize = 7;
+const LANE_WIDTH: f32 = 1.5;
+const ROAD_WIDTH: f32 = LANE_WIDTH * LANES as f32;
 const ROAD_LENGTH: f32 = 10000.0;
+
+
+fn lane_x(lane: usize) -> f32 {
+    (lane as f32 - (LANES - 1) as f32 / 2.0) * LANE_WIDTH
+}
 
 const MOVEMENT_SIDE_SPEED_SCALAR: f32 = 0.013;
 const MAX_SIDEWAYS_SPEED: f32 = 40.0;
-const SIDEWAYS_RESPONSIVENESS: f32 = 20.0;
+const DECAY_RATE: f32 = 20.0;
 
 const ACCELERATION: f32 = 20.0;
 const DEACCELERATION: f32 = 1000.0;
@@ -323,7 +330,7 @@ fn handle_mouse_motion(
     let mouse_speed = accumulated_motion.delta.x / dt;
     let target = (mouse_speed * MOVEMENT_SIDE_SPEED_SCALAR).clamp(-MAX_SIDEWAYS_SPEED, MAX_SIDEWAYS_SPEED);
 
-    velocity.x.smooth_nudge(&target, SIDEWAYS_RESPONSIVENESS, dt);
+    velocity.x.smooth_nudge(&target, DECAY_RATE, dt);
 
     if target == 0.0 && velocity.x.abs() < 0.1 {
         velocity.x = 0.0;
@@ -400,27 +407,35 @@ fn game_setup(
         })
         .load("textures/road.png");
 
-    let material_handle = materials.add(StandardMaterial {
-        base_color_texture: Some(texture_handle),
-        // The texture is square, so one tile covers ROAD_WIDTH x ROAD_WIDTH world units.
-        uv_transform: Affine2::from_scale(Vec2::new(1.0, ROAD_LENGTH / ROAD_WIDTH)),
-        ..default()
-    });
+    let lane_mesh: Handle<Mesh> = meshes.add(Rectangle::new(LANE_WIDTH, ROAD_LENGTH));
 
-    let mesh_handle: Handle<Mesh> = meshes.add(Rectangle::new(ROAD_WIDTH, ROAD_LENGTH));
+    commands
+        .spawn((
+            RigidBody::Static,
+            DespawnOnExit(GameState::Game),
+            Collider::cuboid(ROAD_WIDTH, 0.05, ROAD_LENGTH),
+            Transform::from_xyz(0.0, -0.05, 0.0),
+        ))
+        .with_children(|road| {
+            for lane in 0..LANES {
+                let material = materials.add(StandardMaterial {
+                    base_color_texture: Some(texture_handle.clone()),
+                    uv_transform: Affine2::from_scale_angle_translation(
+                        Vec2::new(1.0 / LANES as f32, ROAD_LENGTH / ROAD_WIDTH),
+                        0.0,
+                        Vec2::new(lane as f32 / LANES as f32, 0.0),
+                    ),
+                    ..default()
+                });
 
-    commands.spawn((
-        RigidBody::Static,
-        DespawnOnExit(GameState::Game),
-        // Collider::Qua(ROAD_WIDTH, 0.1, ROAD_LENGTH),
-        Collider::cuboid(ROAD_WIDTH, 0.05, ROAD_LENGTH),
-        Transform::from_xyz(0.0, -0.05, 0.0),
-        children![(
-            Mesh3d(mesh_handle),
-            MeshMaterial3d(material_handle),
-            Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
-        )],
-    ));
+                road.spawn((
+                    Mesh3d(lane_mesh.clone()),
+                    MeshMaterial3d(material),
+                    Transform::from_xyz(lane_x(lane), 0.05, 0.0)
+                        .with_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
+                ));
+            }
+        });
 
     commands.spawn((
         RigidBody::Static,
